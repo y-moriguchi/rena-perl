@@ -192,27 +192,29 @@ sub action {
 sub letrec {
     my $self = shift;
     my @args = @_;
-    my $g = sub {
-        my $g = shift;
-        return $g->($g);
-    };
-    my $p = sub {
-        my $p = shift;
-        my @res = ();
-        foreach my $li (@args) {
-            (sub {
-                my $li = shift;
-                push @res, sub {
-                    my $match = shift;
-                    my $lastIndex = shift;
-                    my $attr = shift;
-                    return ($li->($p->($p)))->($match, $lastIndex, $attr);
-                };
-            })->($li);
-        }
-        return @res;
-    };
-    return ($g->($p))[0];
+    my @delays = ();
+    my @memo = ();
+
+    for(my $i = 0; $i <= $#args; $i++) {
+        push @delays, undef;
+        push @memo, undef;
+    }
+    for(my $i = 0; $i <= $#args; $i++) {
+        (sub {
+            my $i = shift;
+            $delays[$i] = sub {
+                my $match = shift;
+                my $lastIndex = shift;
+                my $attr = shift;
+
+                if(!(defined $memo[$i])) {
+                    $memo[$i] = $args[$i]->(@delays);
+                }
+                return $memo[$i]->($match, $lastIndex, $attr);
+            }
+        })->($i);
+    }
+    return $delays[0];
 }
 
 sub oneOrMore {
